@@ -1,21 +1,17 @@
 <?php
-
 namespace App\Console\Commands\Cron;
 
-use Illuminate\Console\Command;
 use App\Models\CrowdfundingProduct;
 use App\Models\Order;
 use Carbon\Carbon;
+use Illuminate\Console\Command;
 use App\Services\OrderService;
-use App\Jobs\RefundCrowdfundingOrders;
 
 class FinishCrowdfunding extends Command
 {
-
     protected $signature = 'cron:finish-crowdfunding';
 
     protected $description = '结束众筹';
-
 
     public function handle()
     {
@@ -54,9 +50,21 @@ class FinishCrowdfunding extends Command
             'status' => CrowdfundingProduct::STATUS_FAIL,
         ]);
 
-        dispatch(new RefundCrowdfundingOrders($crowdfunding));
+        $orderService = app(OrderService::class);
+        // 查询出所有参与了此众筹的订单
+        Order::query()
+            // 订单类型为众筹商品订单
+            ->where('type', Order::TYPE_CROWDFUNDING)
+            // 已支付的订单
+            ->whereNotNull('paid_at')
+            ->whereHas('items', function ($query) use ($crowdfunding) {
+                // 包含了当前商品
+                $query->where('product_id', $crowdfunding->product_id);
+            })
+            ->get()
+            ->each(function (Order $order) use ($orderService) {
+                //调用退款逻辑
+                $orderService->refundOrder($order);
+            });
     }
-
-
-
 }
