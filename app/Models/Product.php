@@ -111,5 +111,10 @@ class Product extends Model
         return $arr;
     }
  
+    //据商品 ID 从数据库里查询对应的商品
+    public function scopeByIds($query, $ids)
+    {
+        return $query->whereIn('id', $ids)->orderByRaw(sprintf("FIND_IN_SET(id, '%s')", join(',', $ids)));
+    }
 
 }
